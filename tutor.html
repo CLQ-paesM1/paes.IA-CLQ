@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tutor Matemático – CLQ</title>
+    <link rel="stylesheet" href="simulador.css">
+    <!-- Tipografía Poppins para el tutor -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="tutor-page">
+    <header class="tutor-header">
+        <div class="header-content">
+            <h1>Tutor Matemático CLQ</h1>
+            <p>Plantea tu duda en lenguaje natural y recibe una explicación clara y completa.</p>
+        </div>
+    </header>
+    <main class="tutor-container">
+        <div id="chat" class="chat-window">
+            <!-- Los mensajes se añadirán aquí -->
+        </div>
+        <!-- Botón para limpiar la conversación -->
+        <div class="chat-actions">
+            <button id="clear-chat" class="btn secondary small" type="button">Limpiar conversación</button>
+        </div>
+        <form id="chat-form" class="chat-form" autocomplete="off">
+            <input type="text" id="user-input" placeholder="Escribe tu pregunta o problema..." required>
+            <button type="submit" class="btn">Enviar</button>
+        </form>
+    </main>
+    <!-- Script de tutor incorporado -->
+    <script src="config.js"></script>
+    <script>
+    // Módulo de tutor. Si se dispone de clave OPENAI_API_KEY utilizará la API de ChatGPT.
+    const chatWindow = document.getElementById('chat');
+    const chatForm = document.getElementById('chat-form');
+    const userInput = document.getElementById('user-input');
+
+    // Diccionario de temas con respuestas ejemplo y sugerencias de práctica
+    const tutorTopics = {
+        algebra: {
+            /* Eliminamos la letra "x" de las palabras clave para evitar capturar consultas generales (como derivadas) */
+            keywords: ['ecuación', 'álgebra', 'variable'],
+            response: 'Para resolver ecuaciones de primer grado, despeja la incógnita. Por ejemplo, en 2x + 3 = 9, resta 3 a ambos lados y luego divide por 2 para obtener x = 3.',
+            practice: 'Resuelve: 3x - 5 = 10. ¿Cuál es el valor de x?'
+        },
+        geometria: {
+            keywords: ['triángulo', 'ángulo', 'geometría', 'perímetro', 'área', 'rectángulo'],
+            response: 'En geometría, el perímetro de un rectángulo se calcula sumando el doble de su ancho y largo. El área es ancho por largo. Si tienes un triángulo, recuerda que la suma de sus ángulos internos es 180°.',
+            practice: 'Calcula el área de un rectángulo de 5 cm de largo y 3 cm de ancho.'
+        },
+        funciones: {
+            keywords: ['función', 'gráfica', 'pendiente', 'parábola'],
+            response: 'Una función lineal tiene la forma f(x) = mx + b donde m es la pendiente y b es la ordenada al origen. Para trazarla, ubica el punto (0, b) y a partir de ahí aplica la pendiente.',
+            practice: 'Dibuja la gráfica de f(x) = 2x + 1 e indica su pendiente y su intercepto.'
+        },
+        probabilidad: {
+            keywords: ['probabilidad', 'dados', 'azar', 'dados', 'evento'],
+            response: 'La probabilidad de un evento es la razón entre casos favorables y casos posibles. Por ejemplo, al lanzar un dado justo, la probabilidad de obtener un 6 es 1/6.',
+            practice: 'Si lanzas una moneda dos veces, ¿cuál es la probabilidad de obtener dos caras?'
+        }
+        , conjuntos: {
+            keywords: ['conjunto', 'intersección', 'unión', 'elemento'],
+            response: 'Los conjuntos son colecciones de elementos bien definidos. La intersección A ∩ B incluye solo los elementos que pertenecen a ambos conjuntos, mientras que la unión A ∪ B combina todos los elementos de ambos conjuntos.',
+            practice: 'Dados los conjuntos A = {1,3,5} y B = {3,4,5}, calcula A ∪ B y A ∩ B.'
+        },
+        datos: {
+            keywords: ['media', 'mediana', 'moda', 'promedio', 'datos', 'estadística'],
+            response: 'En estadística, la media se calcula sumando todos los datos y dividiendo por la cantidad de elementos. La mediana es el valor central al ordenar los datos y la moda es el valor que más se repite.',
+            practice: 'Para el conjunto {2, 4, 4, 5, 6}, calcula la media, la mediana y la moda.'
+        },
+        calculo: {
+            keywords: ['derivada', 'derivar', 'integral', 'integrar', 'límite', 'cálculo'],
+            response: 'El cálculo estudia conceptos como límites, derivadas e integrales. La derivada mide la tasa de cambio instantánea de una función, mientras que la integral calcula el área bajo una curva.',
+            practice: 'Calcula la derivada de f(x) = x^3 + 2x y la integral de g(x) = 2x.'
+        }
+    };
+
+    // Historial de conversación para ChatGPT
+    const conversation = [
+      { role: 'system', content: 'Eres un tutor de matemáticas en español. Responde de forma clara, paso a paso, con empatía y ejemplos.' }
+    ];
+
+    /**
+     * Llama a la API de OpenAI para obtener una respuesta basada en el historial.
+     * Requiere que OPENAI_API_KEY esté definida en config.js.
+     * @param {string} question
+     */
+    async function fetchGPTResponse(question) {
+      // Agrega la pregunta del usuario al historial
+      conversation.push({ role: 'user', content: question });
+      try {
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${OPENAI_API_KEY}`
+          },
+          body: JSON.stringify({
+            model: 'gpt-3.5-turbo',
+            messages: conversation
+          })
+        });
+        if (!response.ok) {
+          throw new Error('Error al comunicarse con OpenAI');
+        }
+        const data = await response.json();
+        const answer = data.choices[0].message.content.trim();
+        // Agrega la respuesta de la IA al historial
+        conversation.push({ role: 'assistant', content: answer });
+        return answer;
+      } catch (err) {
+        console.error(err);
+        return null;
+      }
+    }
+
+    // Función para añadir mensajes al chat
+    function addMessage(text, sender) {
+        const msg = document.createElement('div');
+        msg.classList.add('message', sender);
+        msg.textContent = text;
+        chatWindow.appendChild(msg);
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+    }
+
+    // Función para procesar la entrada del usuario
+    async function processInput(input) {
+        const lower = input.toLowerCase();
+        // Si hay una clave API, intentar con ChatGPT
+        if (typeof OPENAI_API_KEY === 'string' && OPENAI_API_KEY.trim() !== '') {
+            const aiAnswer = await fetchGPTResponse(input);
+            if (aiAnswer) {
+                return aiAnswer;
+            }
+        }
+        // En caso contrario, buscar coincidencias en los temas predefinidos
+        for (const topic in tutorTopics) {
+            const { keywords, response, practice } = tutorTopics[topic];
+            if (keywords.some(k => lower.includes(k))) {
+                return `${response}\n\nEjercicio propuesto: ${practice}`;
+            }
+        }
+        // Respuesta predeterminada
+        return 'Lo siento, no logro identificar el tema específico de tu consulta. Intenta formular tu duda indicando el concepto (ejemplo: ecuaciones, triángulos, funciones).';
+    }
+
+    chatForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const question = userInput.value.trim();
+        if (!question) return;
+        addMessage(question, 'user');
+        const answer = await processInput(question);
+        setTimeout(() => {
+            addMessage(answer, 'bot');
+        }, 400);
+        userInput.value = '';
+    });
+
+    // Limpia la conversación al pulsar el botón correspondiente
+    const clearBtn = document.getElementById('clear-chat');
+    clearBtn.addEventListener('click', () => {
+        chatWindow.innerHTML = '';
+        userInput.value = '';
+    });
+    </script>
+</body>
+</html>
